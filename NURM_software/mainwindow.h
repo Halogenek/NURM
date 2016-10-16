@@ -30,6 +30,9 @@ private slots:
 private:
     Ui::MainWindow *ui;
     AboutWindow *aboutwindow;
+
+    int serial_write_double(double);
+    double serial_read_double(void);
 };
 
 #endif // MAINWINDOW_H
