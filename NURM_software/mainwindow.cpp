@@ -10,7 +10,7 @@
 QSerialPort *serial_port;
 
 double MainWindow::serial_read_double(void){
-    char string[6];
+    char string[10];
     serial_port->read(string, sizeof(string));
     //if the computer wont receive data for more then 200ms stop measurment
     if(serial_port->waitForReadyRead(200) != true){
@@ -24,8 +24,8 @@ double MainWindow::serial_read_double(void){
 }
 
 int MainWindow::serial_write_double(double number){
-    char string[6];
-    snprintf(string, sizeof(string), "%g", number);
+    char string[10];
+    snprintf(string, sizeof(string), "%f", number);
     if(serial_port->write(string, sizeof(string)) == -1){
         QMessageBox msgBox;
         msgBox.setText("Device offline!");
@@ -68,7 +68,7 @@ MainWindow::MainWindow(QWidget *parent) :
     serial_port->setStopBits(QSerialPort::OneStop);
     serial_port->setFlowControl(QSerialPort::NoFlowControl);
     //BLOCK THE START BUTTON
-    ui->StartButton->setEnabled(false);
+    ui->StartButton->setEnabled(true);
 }
 
 MainWindow::~MainWindow()
@@ -121,17 +121,19 @@ void MainWindow::on_ConnectButton_clicked()
     serial_port->setPortName(ui->ComPortsList->currentText());
     serial_port->open(QIODevice::ReadWrite);
     //test the connection
-    serial_port->write("1", 1);
-    serial_port->waitForBytesWritten(100);
     char test;
+    serial_port->write("1", 1);
+    //serial_port->waitForBytesWritten(100);
     serial_port->read(&test, 1);
-    serial_port->waitForReadyRead(100);
+    serial_port->waitForReadyRead(200);
     if (test == '1'){
         QMessageBox msgBox;
         msgBox.setText("Device connected!");
         msgBox.exec();
         //allow to start the measurment
         ui->StartButton->setEnabled(true);
+        ui->ComPortsList->setEnabled(false);
+        ui->ConnectButton->setEnabled(false);
     }
 }
 
