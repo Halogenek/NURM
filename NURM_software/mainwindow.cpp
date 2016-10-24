@@ -6,34 +6,59 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define TIMER_STEPS   1024
+#define ADC_RES       1024
+#define ADC_VOL_REF   1.1
+#define PWM_VOL_MAX   5
+
 //CREATE POINTER FOR SERIAL PORT
 QSerialPort *serial_port;
 
-double MainWindow::serial_read_double(void){
-    char string[10];
+uint16_t MainWindow::serial_read_uint16_t(void) {
+    char string[5];
     serial_port->read(string, sizeof(string));
     //if the computer wont receive data for more then 200ms stop measurment
-    if(serial_port->waitForReadyRead(200) != true){
+    if(serial_port->waitForReadyRead(200) != true) {
         QMessageBox msgBox;
         msgBox.setText("Device offline!");
         msgBox.exec();
-        ui->StartButton->setEnabled(false);
+        //ui->StartButton->setEnabled(false);
         return -1;
     }
-    return strtod(string, NULL);
+    uint16_t number = 0;
+    unsigned char counter;
+    for (counter = 0; counter < sizeof(string) &&
+        string[counter] >= '0' && string[counter] <= '9'; counter++) {
+      number = number * 10 + string[counter] - '0';
+    }
+    return number;
+    //return atoi(string);
 }
 
-int MainWindow::serial_write_double(double number){
-    char string[10];
-    snprintf(string, sizeof(string), "%f", number);
-    if(serial_port->write(string, sizeof(string)) == -1){
+int MainWindow::serial_write_uint16_t(uint16_t number) {
+    char string[5];
+    unsigned char length = sizeof(string);
+    do {
+        string[length--]= (number % 10) + '0';
+        number = number / 10;
+    } while (length);
+    //snprintf(string, sizeof(string), "%d", number);
+    if(serial_port->write(string, sizeof(string)) == -1) {
         QMessageBox msgBox;
         msgBox.setText("Device offline!");
         msgBox.exec();
-        ui->StartButton->setEnabled(false);
+        //ui->StartButton->setEnabled(false);
         return -1;
     }
     return 0;
+}
+
+uint16_t MainWindow::convert_double_to_voltage(double number) {
+    return (uint16_t)(number * (TIMER_STEPS - 1) / 5);
+}
+
+double MainWindow::convert_current_to_double(uint16_t number) {
+    return (double)(number * ADC_VOL_REF / (ADC_RES - 1));
 }
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -79,6 +104,9 @@ MainWindow::~MainWindow()
 
 void MainWindow::on_StartButton_clicked()
 {
+    //clear the graphs
+    ui->UIplot->graph(0)->setData((QVector<double>)0, (QVector<double>)0);
+    ui->URplot->graph(0)->setData((QVector<double>)0, (QVector<double>)0);
     //start the measurment
     //get the max values
     double max_u, max_i, actual_current, maximal_actual_current, maximal_actual_resistance;
@@ -87,11 +115,14 @@ void MainWindow::on_StartButton_clicked()
     max_i = ui->MaxI->value();
     //for each minimal step send voltage as string to microcontroler and receive string with amps then plot that
     for(double actual_voltage = 0; actual_voltage < max_u; actual_voltage += 0.005){
-        if(serial_write_double(actual_voltage) == -1)
+        actual_current = actual_voltage/100;
+        if(serial_write_uint16_t(convert_double_to_voltage(actual_voltage)) == -1) {
             return;
-        actual_current = serial_read_double();
-        if(actual_current == -1)
+        }
+        actual_current = convert_current_to_double(serial_read_uint16_t());
+        if(actual_current == -1) {
             return;
+        }
         ui->UIplot->graph(0)->addData(actual_voltage, actual_current);
         ui->UIplot->xAxis->setRange(0, actual_voltage);
         if(actual_current > maximal_actual_current){
@@ -100,14 +131,14 @@ void MainWindow::on_StartButton_clicked()
         }
         ui->UIplot->replot();
         //if the maximum current is reached
-        if(actual_current >= max_i){
-            serial_write_double(0.0);
-            return;
-        }
+        //if(actual_current >= max_i) {
+        //    serial_write_uint16_t(0);
+        //    return;
+        //}
         if(actual_current != 0){
             ui->URplot->graph(0)->addData(actual_voltage, actual_voltage/actual_current);
             ui->URplot->xAxis->setRange(0, actual_voltage);
-            if(actual_voltage/actual_current > maximal_actual_resistance){
+            if(actual_voltage/actual_current > maximal_actual_resistance) {
                 maximal_actual_resistance = actual_voltage/actual_current;
                 ui->URplot->yAxis->setRange(0, maximal_actual_resistance);
             }
@@ -121,20 +152,20 @@ void MainWindow::on_ConnectButton_clicked()
     serial_port->setPortName(ui->ComPortsList->currentText());
     serial_port->open(QIODevice::ReadWrite);
     //test the connection
-    char test;
-    serial_port->write("1", 1);
+    //char test;
+    //serial_port->write("1", 1);
     //serial_port->waitForBytesWritten(100);
-    serial_port->read(&test, 1);
-    serial_port->waitForReadyRead(200);
-    if (test == '1'){
-        QMessageBox msgBox;
-        msgBox.setText("Device connected!");
-        msgBox.exec();
+    //serial_port->read(&test, 1);
+    //serial_port->waitForReadyRead(200);
+    //if (test == '1'){
+    //    QMessageBox msgBox;
+    //    msgBox.setText("Device connected!");
+    //    msgBox.exec();
         //allow to start the measurment
-        ui->StartButton->setEnabled(true);
-        ui->ComPortsList->setEnabled(false);
-        ui->ConnectButton->setEnabled(false);
-    }
+     //   ui->StartButton->setEnabled(true);
+     //   ui->ComPortsList->setEnabled(false);
+     //   ui->ConnectButton->setEnabled(false);
+    //}
 }
 
 void MainWindow::on_actionSave_UI_plot_to_PNG_triggered()

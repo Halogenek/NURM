@@ -31,8 +31,10 @@ private:
     Ui::MainWindow *ui;
     AboutWindow *aboutwindow;
 
-    int serial_write_double(double);
-    double serial_read_double(void);
+    int serial_write_uint16_t(uint16_t);
+    uint16_t serial_read_uint16_t(void);
+    uint16_t convert_double_to_voltage(double number);
+    double convert_current_to_double(uint16_t number);
 };
 
 #endif // MAINWINDOW_H
