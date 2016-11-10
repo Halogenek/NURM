@@ -1,6 +1,6 @@
 /*
 Code for the NURM hardware part.
-Runs on an ATMEL ATmega32 micro which using PWM generates voltage on
+Runs on an ATMEL ATmega328p micro which using PWM generates voltage on
 an element under test and the measuring the current.
 
 Author: Jakub Niemczuk
@@ -16,8 +16,8 @@ Author: Jakub Niemczuk
 #include <stdio.h>
 #include <stdlib.h>
 //UART BAUD RATE
-#define BAUD 9600
-#define BAUDRATE F_CPU/16/BAUD-1
+#define USART_BAUDRATE 9600
+#define BAUD_PRESCALE (((F_CPU/(USART_BAUDRATE*16UL)))-1)
 /////////////////////////////////////////////
 void uitstr(char *, uint16_t, char);
 uint16_t strtui(char *, char);
@@ -36,19 +36,24 @@ void main(void) {
   int16_t something2 = 12345;
   while (1) {
     something2 = serial_read_int16_t();
-    serial_write_int16_t(something2);
+    _delay_ms(10);
+    serial_write_int16_t(something2 / 2 + 100);
     //serial_write_uchar('\n');
     //serial_write_uchar('\r');
+    //serial_write_int16_t(65323);
+    //_delay_ms(100);
   }
   for(;;);
 }
 /////////////////////////////////////////////
 //uint16_t to string
 void uitstr(char *str, uint16_t ul, char length) {
+  length--;
+  str[length--] = '\0';
   do {
-    str[length--]= (ul % 10) + '0';
+    str[length--] = (ul % 10) + '0';
     ul = ul / 10;
-  } while (length);
+  } while (length + 1);
 }
 //string to uint16_t
 uint16_t strtui(char *str, char length) {
@@ -65,15 +70,19 @@ uint16_t strtui(char *str, char length) {
 void serial_write_int16_t(int16_t number){
   char string[5];
   int counter;
-  for (counter = 0; counter < sizeof(string); counter++) {
-    string[counter] = '\0';
-  }
-  counter = 0;
+  string[4] = '\0';
+  //for (counter = 0; counter < sizeof(string); counter++) {
+  //  string[counter] = '\0';
+  //}
+  //counter = 1;
   uitstr(string, number, sizeof(string));
-  do {
+  for (counter = 0; counter < sizeof(string); counter++) {
     serial_write_uchar(string[counter]);
-    counter++;
-  } while (counter <= sizeof(string));
+  }
+  //do {
+  //  serial_write_uchar(string[counter]);
+  //  counter++;
+  //} while (counter <= sizeof(string));
 }
 //read uint16_t
 int16_t serial_read_int16_t(void){
@@ -82,7 +91,7 @@ int16_t serial_read_int16_t(void){
   for (counter = 0; counter < sizeof(string); counter++) {
     string[counter] = '\0';
   }
-  counter = 0;
+  //counter = 0;
   for (counter = 0; counter < sizeof(string); counter++) {
     string[counter] = serial_recieve_uchar();
   }
@@ -90,13 +99,13 @@ int16_t serial_read_int16_t(void){
 }
 //send char
 void serial_write_uchar(char data) {
-  while (!( UCSRA & (1<<UDRE))); // wait while register is free
-  UDR = data; //load data in the register
+  while (!( UCSR0A & (1<<UDRE0))); // wait while register is free
+  UDR0 = data; //load data in the register
 }
 //receive char
 char serial_recieve_uchar(void) {
-  while(!(UCSRA & (1<<RXC))); //wait while data is being received
-  return UDR; //return 8-bit data
+  while(!(UCSR0A & (1<<RXC0))); //wait while data is being received
+  return UDR0; //return 8-bit data
 }
 /////////////////////////////////////////////
 //set serial
@@ -105,10 +114,10 @@ void serial_init(void) {
   //8-bit character size
   //one stop bit
   //no parity bit
-  UBRRH = (BAUDRATE>>8); //setting the baudrate MSB
-  UBRRL = BAUDRATE; //setting the baudrate LSB
-  UCSRB |= (1<<TXEN)|(1<<RXEN); //enable tx and rx
-  UCSRC |= (1<<URSEL)|(1<<UCSZ0)|(1<<UCSZ1); // 8bit data format
+  UCSR0B |= (1<<RXEN0) | (1<<TXEN0); //enable tx and rx
+  UCSR0C |= (1<<UCSZ00) | (1<<UCSZ01); // 8bit data format
+  UBRR0H  = (BAUD_PRESCALE >> 8); //setting the baudrate MSB
+  UBRR0L  = BAUD_PRESCALE; //setting the baudrate LSB
 }
 //set pwm
 void pwm_init(void) {

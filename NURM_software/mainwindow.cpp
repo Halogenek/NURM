@@ -5,6 +5,7 @@
 #include <QFileDialog>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
 
 #define TIMER_STEPS   1024
 #define ADC_RES       1024
@@ -37,13 +38,9 @@ uint16_t MainWindow::serial_read_uint16_t(void) {
 
 int MainWindow::serial_write_uint16_t(uint16_t number) {
     char string[5];
-    unsigned char length = sizeof(string);
-    do {
-        string[length--]= (number % 10) + '0';
-        number = number / 10;
-    } while (length);
-    //snprintf(string, sizeof(string), "%d", number);
-    if(serial_port->write(string, sizeof(string)) == -1) {
+    snprintf(string, sizeof(string), "%04u", number);
+    serial_port->write(string, sizeof(string));
+    if(serial_port->waitForBytesWritten(50) == false) {
         QMessageBox msgBox;
         msgBox.setText("Device offline!");
         msgBox.exec();
@@ -54,11 +51,11 @@ int MainWindow::serial_write_uint16_t(uint16_t number) {
 }
 
 uint16_t MainWindow::convert_double_to_voltage(double number) {
-    return (uint16_t)(number * (TIMER_STEPS - 1) / 5);
+    return (uint16_t)(number * ((TIMER_STEPS - 1.0) / 5));
 }
 
 double MainWindow::convert_current_to_double(uint16_t number) {
-    return (double)(number * ADC_VOL_REF / (ADC_RES - 1));
+    return (double)(number * (ADC_VOL_REF / (ADC_RES - 1.0)));
 }
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -113,6 +110,7 @@ void MainWindow::on_StartButton_clicked()
     actual_current = maximal_actual_current = maximal_actual_resistance = 0;
     max_u = ui->MaxU->value();
     max_i = ui->MaxI->value();
+    //serial_write_uint16_t(convert_double_to_voltage(1.1)); //////////////////////////////////////////////////////////////////////////////////////////
     //for each minimal step send voltage as string to microcontroler and receive string with amps then plot that
     for(double actual_voltage = 0; actual_voltage < max_u; actual_voltage += 0.005){
         actual_current = actual_voltage/100;

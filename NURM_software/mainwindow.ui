@@ -227,7 +227,7 @@
      <x>0</x>
      <y>0</y>
      <width>879</width>
-     <height>27</height>
+     <height>19</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuPlot">
