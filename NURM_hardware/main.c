@@ -16,7 +16,7 @@ Author: Jakub Niemczuk
 #include <stdio.h>
 #include <stdlib.h>
 //UART BAUD RATE
-#define USART_BAUDRATE 9600
+#define USART_BAUDRATE 57600 //9600
 #define BAUD_PRESCALE (((F_CPU/(USART_BAUDRATE*16UL)))-1)
 /////////////////////////////////////////////
 void uitstr(char *, uint16_t, char);
@@ -27,17 +27,19 @@ void serial_write_uchar(char);
 char serial_recieve_uchar(void);
 void serial_init(void);
 void pwm_init(void);
+void adc_init(void);
 /////////////////////////////////////////////
 void main(void) {
   serial_init();
   pwm_init();
-  int i;
-  char something;
-  int16_t something2 = 12345;
+  adc_init();
+  int16_t something;
+  //OCR1A = 220;
   while (1) {
-    something2 = serial_read_int16_t();
-    _delay_ms(10);
-    serial_write_int16_t(something2 / 2 + 100);
+    OCR1A = serial_read_int16_t();
+    ADCSRA |= (1<<ADSC);
+    while( ADCSRA & (1<<ADSC) ); // wait until ADC conversion is complete
+    serial_write_int16_t(ADC);
     //serial_write_uchar('\n');
     //serial_write_uchar('\r');
     //serial_write_int16_t(65323);
@@ -123,6 +125,13 @@ void serial_init(void) {
 void pwm_init(void) {
   TCCR1A |= (1<<COM1A1)|(1<<WGM11)|(1<<WGM10);
   TCCR1B |= (1<<WGM12)|(1<<CS10);
-  DDRD |= (1<<PD5);
+  DDRB |= (1<<PB1);
   OCR1A = 0;
+}
+//set adc
+void adc_init(void) {
+  ADMUX |= (1<<REFS1)|(1<<REFS0); //set internal 1.1V ref
+  DIDR0 |= (1<<ADC0D); //disale IO function on adc0
+  ADCSRA |= (1<<ADPS2)|(1<<ADPS1)|(1<<ADPS0); //128 prescaler for adc clock
+  ADCSRA |= (1<<ADEN); //enable adc
 }

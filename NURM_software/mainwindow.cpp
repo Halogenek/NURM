@@ -1,7 +1,7 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
-#include <QtSerialPort/QSerialPort>
-#include <QtSerialPort/QSerialPortInfo>
+#include <QSerialPort>
+#include <QSerialPortInfo>
 #include <QFileDialog>
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,8 +23,8 @@ uint16_t MainWindow::serial_read_uint16_t(void) {
         QMessageBox msgBox;
         msgBox.setText("Device offline!");
         msgBox.exec();
-        //ui->StartButton->setEnabled(false);
-        return -1;
+        ui->StartButton->setEnabled(false);
+        return 65535; //max uint_16 value used as a error sign
     }
     uint16_t number = 0;
     unsigned char counter;
@@ -44,14 +44,14 @@ int MainWindow::serial_write_uint16_t(uint16_t number) {
         QMessageBox msgBox;
         msgBox.setText("Device offline!");
         msgBox.exec();
-        //ui->StartButton->setEnabled(false);
+        ui->StartButton->setEnabled(false);
         return -1;
     }
     return 0;
 }
 
 uint16_t MainWindow::convert_double_to_voltage(double number) {
-    return (uint16_t)(number * ((TIMER_STEPS - 1.0) / 5));
+    return (uint16_t)(number * ((TIMER_STEPS - 1.0) / 5.0));
 }
 
 double MainWindow::convert_current_to_double(uint16_t number) {
@@ -84,13 +84,13 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->URplot->yAxis->setRange(0, 50);
     //CONFIGURE SERIAL PORT
     serial_port = new QSerialPort(this);
-    serial_port->setBaudRate(QSerialPort::Baud9600);
+    serial_port->setBaudRate(QSerialPort::Baud57600);
     serial_port->setDataBits(QSerialPort::Data8);
     serial_port->setParity(QSerialPort::NoParity);
     serial_port->setStopBits(QSerialPort::OneStop);
     serial_port->setFlowControl(QSerialPort::NoFlowControl);
     //BLOCK THE START BUTTON
-    ui->StartButton->setEnabled(true);
+    ui->StartButton->setEnabled(false);
 }
 
 MainWindow::~MainWindow()
@@ -101,26 +101,28 @@ MainWindow::~MainWindow()
 
 void MainWindow::on_StartButton_clicked()
 {
+    ui->StartButton->setEnabled(false);
     //clear the graphs
     ui->UIplot->graph(0)->setData((QVector<double>)0, (QVector<double>)0);
     ui->URplot->graph(0)->setData((QVector<double>)0, (QVector<double>)0);
     //start the measurment
     //get the max values
     double max_u, max_i, actual_current, maximal_actual_current, maximal_actual_resistance;
+    uint16_t temp;
     actual_current = maximal_actual_current = maximal_actual_resistance = 0;
     max_u = ui->MaxU->value();
     max_i = ui->MaxI->value();
-    //serial_write_uint16_t(convert_double_to_voltage(1.1)); //////////////////////////////////////////////////////////////////////////////////////////
-    //for each minimal step send voltage as string to microcontroler and receive string with amps then plot that
+    //for each minimal step send voltage to microcontroler and receive amps then plot that
     for(double actual_voltage = 0; actual_voltage < max_u; actual_voltage += 0.005){
-        actual_current = actual_voltage/100;
         if(serial_write_uint16_t(convert_double_to_voltage(actual_voltage)) == -1) {
             return;
         }
-        actual_current = convert_current_to_double(serial_read_uint16_t());
-        if(actual_current == -1) {
+        temp = serial_read_uint16_t();
+        qDebug() << temp;
+        if(temp == 65535) {
             return;
         }
+        actual_current = convert_current_to_double(temp);
         ui->UIplot->graph(0)->addData(actual_voltage, actual_current);
         ui->UIplot->xAxis->setRange(0, actual_voltage);
         if(actual_current > maximal_actual_current){
@@ -143,6 +145,7 @@ void MainWindow::on_StartButton_clicked()
             ui->URplot->replot();
         }
     }
+    ui->StartButton->setEnabled(true);
 }
 
 void MainWindow::on_ConnectButton_clicked()
@@ -160,9 +163,9 @@ void MainWindow::on_ConnectButton_clicked()
     //    msgBox.setText("Device connected!");
     //    msgBox.exec();
         //allow to start the measurment
-     //   ui->StartButton->setEnabled(true);
-     //   ui->ComPortsList->setEnabled(false);
-     //   ui->ConnectButton->setEnabled(false);
+        ui->StartButton->setEnabled(true);
+        ui->ComPortsList->setEnabled(false);
+        ui->ConnectButton->setEnabled(false);
     //}
 }
 
